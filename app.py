@@ -1,28 +1,28 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.neural_network import MLPClassifier
 
-# Load dataset
-@st.cache_data
-def load_data():
-    return pd.read_csv('dataset.csv')  # Sesuaikan dengan path dataset Anda
-
-# RBF Neural Network implementation
+# Tempatkan class RBFNN di sini setelah semua import
 class RBFNN:
     def __init__(self, n_clusters=10, random_state=42):
         self.n_clusters = n_clusters
         self.random_state = random_state
         self.kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
-        self.mlp = MLPClassifier(hidden_layer_sizes=(), activation='identity', max_iter=500, random_state=random_state)
+        self.mlp = MLPClassifier(hidden_layer_sizes=(50,), activation='relu', max_iter=1000, random_state=random_state)
+        self.spread = None
 
     def fit(self, X, y):
         self.kmeans.fit(X)
+        distances = np.linalg.norm(
+            self.kmeans.cluster_centers_[:, np.newaxis] - self.kmeans.cluster_centers_, axis=2
+        )
+        self.spread = np.max(distances) / np.sqrt(2 * self.n_clusters)
         rbf_features = self._transform_rbf(X)
         self.mlp.fit(rbf_features, y)
 
@@ -32,7 +32,15 @@ class RBFNN:
 
     def _transform_rbf(self, X):
         distances = np.linalg.norm(X[:, np.newaxis] - self.kmeans.cluster_centers_, axis=2)
-        return np.exp(-distances**2)
+        return np.exp(-(distances ** 2) / (2 * (self.spread ** 2)))
+
+# Tempatkan sisa kode Anda seperti biasa
+
+
+# Load dataset
+@st.cache_data
+def load_data():
+    return pd.read_csv('dataset.csv')  # Sesuaikan dengan path dataset Anda
 
 # Load dataset
 data = load_data()
@@ -77,14 +85,9 @@ else:
     if page == "Training dan Validasi":
         st.header("Halaman Training dan Validasi")
 
-        # Reset indeks sebelum menggabungkan
-        X_train_reset = pd.DataFrame(scaler.inverse_transform(X_train), columns=data.columns[:-1])
-        y_train_reset = y_train.reset_index(drop=True)
-        training_data = pd.concat([X_train_reset, y_train_reset], axis=1)
-
         # Tampilkan data training lengkap
         st.write("Data Training:")
-        st.write(training_data)
+        st.write(data)
 
         # Hasil Training
         y_train_pred = model.predict(X_train)
@@ -125,9 +128,6 @@ else:
             elif col in ["IPK", "IPS1", "IPS2", "IPS3", "IPS4"]:
                 # Input angka dengan desimal
                 inputs[col] = st.number_input(f"Masukkan nilai untuk {col} (dengan desimal):", value=0.0, step=0.01, format="%.2f")
-            else:
-                # Input default jika ada kolom lain
-                inputs[col] = st.number_input(f"Masukkan nilai untuk {col}:", value=0.0, step=0.01)
 
         if st.button("Klasifikasi Kelulusan"):
             input_values = np.array([list(inputs.values())])
