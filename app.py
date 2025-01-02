@@ -135,21 +135,40 @@ else:
             prediction = model.predict(input_scaled)
             st.write(f"Hasil Klasifikasi: {prediction[0]}")
 
+
         # Upload file untuk testing
         st.subheader("Upload File CSV untuk Testing")
         uploaded_test_file = st.file_uploader("Pilih File CSV", type="csv")
         if uploaded_test_file:
-            test_data = pd.read_csv(uploaded_test_file)
-            X_new_test = test_data.iloc[:, :-1]
-            y_new_test = test_data.iloc[:, -1]
-            X_new_test_scaled = scaler.transform(X_new_test)
-            y_new_pred = model.predict(X_new_test_scaled)
+            try:
+                test_data = pd.read_csv(uploaded_test_file)
+                
+                # Pastikan kolom dataset baru cocok dengan kolom dataset saat fit
+                missing_features = set(X.columns) - set(test_data.columns)
+                extra_features = set(test_data.columns) - set(X.columns)
+                
+                if missing_features:
+                    st.error(f"Dataset yang diunggah tidak memiliki kolom: {', '.join(missing_features)}")
+                elif extra_features:
+                    st.error(f"Dataset yang diunggah memiliki kolom tambahan: {', '.join(extra_features)}")
+                else:
+                    # Transformasi dan prediksi jika kolom sesuai
+                    X_new_test = test_data[X.columns]
+                    X_new_test_scaled = scaler.transform(X_new_test)
+                    y_new_pred = model.predict(X_new_test_scaled)
 
-            # Tampilkan hasil prediksi
-            test_data["Prediction"] = y_new_pred
-            st.write("Hasil Prediksi untuk Data Testing:")
-            st.write(test_data)
+                    # Tambahkan hasil prediksi ke dataset
+                    test_data["Klasifikasi"] = y_new_pred
+                    st.write("Hasil Klasifikasi untuk Data Testing:")
+                    st.write(test_data)
 
-            # Evaluasi
-            test_accuracy = accuracy_score(y_new_test, y_new_pred)
-            st.write(f"Akurasi Testing: {test_accuracy:.2f}")
+                    # Evaluasi performa model pada data testing
+                    if 'y' in test_data.columns:
+                        y_new_test = test_data['y']
+                        test_accuracy = accuracy_score(y_new_test, y_new_pred)
+                        st.write(f"Akurasi Testing: {test_accuracy:.2f}")
+            except Exception as e:
+                st.error(f"Terjadi kesalahan: {str(e)}")
+        else:
+            st.warning("Silakan unggah file CSV untuk melakukan pengujian.")
+
